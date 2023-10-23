@@ -5,6 +5,9 @@ start:
 install:
 	poetry install
 
+dev-debug:
+	poetry run flask --app page_analyzer:app --debug run
+
 dev:
 	poetry run flask --app page_analyzer:app run
 
