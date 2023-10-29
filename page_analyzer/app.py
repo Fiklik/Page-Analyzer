@@ -1,4 +1,5 @@
 import os
+import requests
 from datetime import datetime
 from flask import (
     Flask, render_template, request,
@@ -69,6 +70,10 @@ def get_site_data(id):
     connection.close()
 
     return data
+
+
+def is_valid_status_code(code):
+    return code == 200
 
 
 def get_site_checks(id):
@@ -193,7 +198,6 @@ def get_site(id):
     }
 
     checks = get_site_checks(id)
-    print(checks)
 
     return render_template(
         'url.html',
@@ -205,14 +209,25 @@ def get_site(id):
 
 @app.route('/urls/<int:id>/checks', methods=['POST'])
 def url_checks(id):
+    site_data = get_site_data(id)
+    url = site_data[1]
+    response_status_code = requests.get(url).status_code
+    valid_status_code = is_valid_status_code(response_status_code)
+
+    if not valid_status_code:
+        flash('Произошла ошибка при проверке', 'danger')
+        return redirect(
+            url_for('get_site', id=id)
+        )
+
     connection = get_db()
     created_at = datetime.now()
 
     with connection.cursor() as cursor:
         cursor.execute('''
-            INSERT INTO url_checks(url_id, created_at)
-            VALUES (%s, %s);
-        ''', (id, created_at,))
+            INSERT INTO url_checks(url_id, status_code, created_at)
+            VALUES (%s, %s, %s);
+        ''', (id, response_status_code, created_at,))
 
     connection.commit()
     connection.close()
