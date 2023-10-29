@@ -10,6 +10,8 @@ import validators
 from urllib.parse import urlparse
 from dotenv import load_dotenv
 import psycopg2
+from bs4 import BeautifulSoup
+# import html.parser
 
 
 load_dotenv()
@@ -211,7 +213,8 @@ def get_site(id):
 def url_checks(id):
     site_data = get_site_data(id)
     url = site_data[1]
-    response_status_code = requests.get(url).status_code
+    response = requests.get(url)
+    response_status_code = response.status_code
     valid_status_code = is_valid_status_code(response_status_code)
 
     if not valid_status_code:
@@ -220,14 +223,43 @@ def url_checks(id):
             url_for('get_site', id=id)
         )
 
+    html_doc = response.content
+    soup = BeautifulSoup(html_doc, 'html.parser')
+    heading = soup.find('h1')
+
+    if heading is None:
+        heading = ''
+    else:
+        heading = heading.string
+
+    title = soup.title.string
+
+    if title is None:
+        title = ''
+
+    description = soup.find('meta', attrs={'name': 'description'})
+
+    if description is None:
+        description = ''
+    else:
+        description = description['content']
+
+    print(heading, title, description)
+
     connection = get_db()
     created_at = datetime.now()
 
     with connection.cursor() as cursor:
         cursor.execute('''
-            INSERT INTO url_checks(url_id, status_code, created_at)
-            VALUES (%s, %s, %s);
-        ''', (id, response_status_code, created_at,))
+            INSERT INTO url_checks(
+                url_id, h1, description, title, status_code, created_at
+            )
+            VALUES (%s, %s, %s, %s, %s, %s);
+        ''', (
+            id, heading,
+            description, title,
+            response_status_code, created_at,
+        ))
 
     connection.commit()
     connection.close()

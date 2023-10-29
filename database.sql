@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS url_checks (
     id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     url_id BIGINT REFERENCES urls(id),
     status_code INTEGER,
-    h1 TEXT,
+    h1 TEXT NOT NULL DEFAULT '',
     title TEXT,
     description TEXT,
     created_at DATE
