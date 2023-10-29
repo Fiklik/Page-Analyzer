@@ -16,3 +16,6 @@ lint:
 
 test:
 	poetry run pytest
+
+build:
+	./build.sh
