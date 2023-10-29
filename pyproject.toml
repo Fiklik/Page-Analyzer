@@ -7,7 +7,7 @@ readme = "README.md"
 packages = [{include = "page_analyzer"}]
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = ">=3.11"
 flask = "^3.0.0"
 gunicorn = "^21.2.0"
 python-dotenv = "^1.0.0"
