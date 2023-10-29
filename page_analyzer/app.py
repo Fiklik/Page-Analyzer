@@ -41,7 +41,7 @@ def normalize_url(url):
     return f'{url.scheme}://{url.netloc}'
 
 
-def get_post_id(name):
+def get_site_id(name):
     connection = get_db()
 
     with connection.cursor() as cursor:
@@ -56,7 +56,7 @@ def get_post_id(name):
     return id
 
 
-def get_post_data(id):
+def get_site_data(id):
     connection = get_db()
 
     with connection.cursor() as cursor:
@@ -69,6 +69,20 @@ def get_post_data(id):
     connection.close()
 
     return data
+
+
+def get_site_checks(id):
+    connection = get_db()
+
+    with connection.cursor() as cursor:
+        cursor.execute('''
+            SELECT * FROM url_checks WHERE url_id = %s ORDER BY id DESC;
+        ''', (id,))
+        checks = cursor.fetchall()
+
+    connection.close()
+
+    return checks
 
 
 def does_url_exists(url):
@@ -106,23 +120,23 @@ def post_urls():
 
     if not prompt_data:
         flash('URL обязателен', 'danger')
-        return redirect(url_for('index')), 422
+        return redirect(url_for('index'))
 
     is_valid = validate_url(prompt_data)
 
     if not is_valid:
         flash('Некорректный URL', 'danger')
-        return redirect(url_for('index')), 422
+        return redirect(url_for('index'))
 
     valid_url = normalize_url(prompt_data)
 
     does_exist = does_url_exists(valid_url)
 
     if does_exist:
-        post_id = get_post_id(valid_url)
+        site_id = get_site_id(valid_url)
         flash('Страница уже существует', 'success')
         return redirect(
-            url_for('get_post', id=post_id)), 322
+            url_for('get_site', id=site_id))
     else:
         created_at = datetime.now()
         connection = get_db()
@@ -137,15 +151,15 @@ def post_urls():
         connection.commit()
         connection.close()
 
-    post_id = get_post_id(valid_url)
+    site_id = get_site_id(valid_url)
     flash('Страница успешно добавлена', 'success')
 
     return redirect(
-        url_for('get_post', id=post_id)), 322
+        url_for('get_site', id=site_id))
 
 
 @app.route('/urls', methods=['GET'])
-def get_posts():
+def get_sites():
     data = []
     connection = get_db()
 
@@ -169,17 +183,41 @@ def get_posts():
 
 
 @app.route('/urls/<int:id>', methods=['GET'])
-def get_post(id):
+def get_site(id):
     messages = get_flashed_messages(True)
-    post_data = get_post_data(id)
+    site_data = get_site_data(id)
     site = {
-        'id': post_data[0],
-        'name': post_data[1],
-        'created_at': post_data[2]
+        'id': site_data[0],
+        'name': site_data[1],
+        'created_at': site_data[2]
     }
+
+    checks = get_site_checks(id)
+    print(checks)
 
     return render_template(
         'url.html',
         site=site,
-        messages=messages
+        messages=messages,
+        checks=checks
+    )
+
+
+@app.route('/urls/<int:id>/checks', methods=['POST'])
+def url_checks(id):
+    connection = get_db()
+    created_at = datetime.now()
+
+    with connection.cursor() as cursor:
+        cursor.execute('''
+            INSERT INTO url_checks(url_id, created_at)
+            VALUES (%s, %s);
+        ''', (id, created_at,))
+
+    connection.commit()
+    connection.close()
+    flash('Страница успешно проверена', 'success')
+
+    return redirect(
+        url_for('get_site', id=id)
     )
