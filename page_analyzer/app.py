@@ -75,7 +75,7 @@ def get_site_data(id):
 
 
 def is_valid_status_code(code):
-    return code == 200
+    return code < 400
 
 
 def get_site_checks(id):
@@ -127,13 +127,13 @@ def post_urls():
 
     if not prompt_data:
         flash('URL обязателен', 'danger')
-        return redirect(url_for('index'))
+        return redirect(url_for('index'), code=422)
 
     is_valid = validate_url(prompt_data)
 
     if not is_valid:
         flash('Некорректный URL', 'danger')
-        return redirect(url_for('index'))
+        return redirect(url_for('index'), code=422)
 
     valid_url = normalize_url(prompt_data)
 
@@ -143,7 +143,7 @@ def post_urls():
         site_id = get_site_id(valid_url)
         flash('Страница уже существует', 'success')
         return redirect(
-            url_for('get_site', id=site_id))
+            url_for('get_site', id=site_id), code=302)
     else:
         created_at = datetime.now()
         connection = get_db()
@@ -162,7 +162,7 @@ def post_urls():
     flash('Страница успешно добавлена', 'success')
 
     return redirect(
-        url_for('get_site', id=site_id))
+        url_for('get_site', id=site_id), code=302)
 
 
 @app.route('/urls', methods=['GET'])
@@ -220,7 +220,7 @@ def url_checks(id):
     if not valid_status_code:
         flash('Произошла ошибка при проверке', 'danger')
         return redirect(
-            url_for('get_site', id=id)
+            url_for('get_site', id=id), code=422
         )
 
     html_doc = response.content
@@ -266,5 +266,5 @@ def url_checks(id):
     flash('Страница успешно проверена', 'success')
 
     return redirect(
-        url_for('get_site', id=id)
+        url_for('get_site', id=id), code=302
     )
