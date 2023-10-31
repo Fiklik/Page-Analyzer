@@ -110,7 +110,7 @@ def does_url_exists(url):
     return exist is not None
 
 
-@app.route('/')
+@app.route('/', methods=['GET'])
 def index():
     create_db()
     messages = get_flashed_messages(with_categories=True)
@@ -127,13 +127,21 @@ def post_urls():
 
     if not prompt_data:
         flash('URL обязателен', 'danger')
-        return redirect(url_for('index'), code=422)
+        messages = get_flashed_messages(with_categories=True)
+        return render_template(
+            'index.html',
+            messages=messages
+        ), 422
 
     is_valid = validate_url(prompt_data)
 
     if not is_valid:
         flash('Некорректный URL', 'danger')
-        return redirect(url_for('index'), code=422)
+        messages = get_flashed_messages(with_categories=True)
+        return render_template(
+            'index.html',
+            messages=messages
+        ), 422
 
     valid_url = normalize_url(prompt_data)
 
@@ -173,11 +181,18 @@ def get_sites():
     with connection.cursor() as cursor:
         try:
             cursor.execute('''
-                    SELECT id, name FROM urls ORDER BY id DESC;
+                    SELECT urls.id, urls.name, 
+                    MAX(url_checks.created_at), url_checks.status_code 
+                    FROM urls JOIN url_checks
+                    ON url_checks.url_id = urls.id
+                    GROUP BY urls.id, urls.name, url_checks.status_code
+                    ORDER BY urls.id DESC;
                 ''')
-            data = cursor.fetchall()
+            sites_and_checks_data = cursor.fetchall()
+            print(type(sites_and_checks_data))
+            print(sites_and_checks_data)
 
-        except (Exception, psycopg2.DatabaseError)as error:
+        except (Exception, psycopg2.DatabaseError) as error:
             connection.rollback()
             print(error)
 
@@ -185,7 +200,7 @@ def get_sites():
 
     return render_template(
         'urls.html',
-        sites=data
+        data=sites_and_checks_data,
     )
 
 
@@ -212,16 +227,28 @@ def get_site(id):
 @app.route('/urls/<int:id>/checks', methods=['POST'])
 def url_checks(id):
     site_data = get_site_data(id)
+    print(site_data)
     url = site_data[1]
-    response = requests.get(url)
+
+    try:
+        response = requests.get(url)
+    except (Exception, requests.exceptions.ConnectionError) as error:
+        print(error)
+        flash('Произошла ошибка при проверке', 'danger')
+
+        return redirect(url_for('get_site', id=id), code=302)
+
     response_status_code = response.status_code
     valid_status_code = is_valid_status_code(response_status_code)
 
     if not valid_status_code:
         flash('Произошла ошибка при проверке', 'danger')
-        return redirect(
-            url_for('get_site', id=id), code=422
-        )
+        messages = get_flashed_messages(with_categories=True)
+
+        return render_template(
+            url_for('url_checks', id=id),
+            messages=messages
+        ), 422
 
     html_doc = response.content
     soup = BeautifulSoup(html_doc, 'html.parser')
@@ -250,6 +277,7 @@ def url_checks(id):
     created_at = datetime.now()
 
     with connection.cursor() as cursor:
+
         cursor.execute('''
             INSERT INTO url_checks(
                 url_id, h1, description, title, status_code, created_at
