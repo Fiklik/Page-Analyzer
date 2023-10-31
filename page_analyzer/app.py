@@ -259,25 +259,18 @@ def url_checks(id):
     ) as error:
         print(error)
         flash('Произошла ошибка при проверке', 'danger')
-        messages = get_flashed_messages(with_categories=True)
+        # messages = get_flashed_messages(with_categories=True)
 
-        return render_template(
-            url_for('get_site', id=id),
-            messages=messages,
-            code=302
-        )
+        return redirect(url_for('get_site', id=id), code=302)
 
     response_status_code = response.status_code
     valid_status_code = is_valid_status_code(response_status_code)
 
     if not valid_status_code:
         flash('Произошла ошибка при проверке', 'danger')
-        messages = get_flashed_messages(with_categories=True)
+        # messages = get_flashed_messages(with_categories=True)
 
-        return render_template(
-            url_for('url_checks', id=id),
-            messages=messages
-        ), 422
+        return redirect(url_for('get_site', id=id), code=302)
 
     html_doc = response.content
     soup = BeautifulSoup(html_doc, 'html.parser')
