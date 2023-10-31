@@ -135,10 +135,7 @@ def index():
     create_db()
     messages = get_flashed_messages(with_categories=True)
 
-    return render_template(
-            'index.html',
-            messages=messages
-        )
+    return render_template('index.html', messages=messages)
 
 
 @app.route('/urls', methods=['POST'])
