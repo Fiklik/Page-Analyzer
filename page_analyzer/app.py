@@ -263,8 +263,9 @@ def url_checks(id):
 
         return render_template(
             url_for('get_site', id=id),
-            messages=messages
-        ), code=302
+            messages=messages,
+            code=302
+        )
 
     response_status_code = response.status_code
     valid_status_code = is_valid_status_code(response_status_code)
