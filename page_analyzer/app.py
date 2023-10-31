@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 from dotenv import load_dotenv
 import psycopg2
 from bs4 import BeautifulSoup
-# import html.parser
+from . import parser
 
 
 load_dotenv()
@@ -71,7 +71,13 @@ def get_site_data(id):
 
     connection.close()
 
-    return data
+    site_data = {
+        'id': data[0],
+        'name': data[1],
+        'created_at': data[2]
+    }
+
+    return site_data
 
 
 def is_valid_status_code(code):
@@ -79,15 +85,29 @@ def is_valid_status_code(code):
 
 
 def get_site_checks(id):
+    checks = []
     connection = get_db()
 
     with connection.cursor() as cursor:
         cursor.execute('''
             SELECT * FROM url_checks WHERE url_id = %s ORDER BY id DESC;
         ''', (id,))
-        checks = cursor.fetchall()
+        data = cursor.fetchall()
 
     connection.close()
+
+    for elem in data:
+        checks.append(
+            {
+                'id': elem[0],
+                'url_id': elem[1],
+                'status_code': elem[2],
+                'h1': elem[3],
+                'title': elem[4],
+                'description': elem[5],
+                'created_at': elem[6]
+            }
+        )
 
     return checks
 
@@ -175,22 +195,20 @@ def post_urls():
 
 @app.route('/urls', methods=['GET'])
 def get_sites():
-    data = []
+    sites = []
     connection = get_db()
 
     with connection.cursor() as cursor:
         try:
             cursor.execute('''
-                    SELECT urls.id, urls.name, 
-                    MAX(url_checks.created_at), url_checks.status_code 
+                    SELECT urls.id, urls.name,
+                    MAX(url_checks.created_at), url_checks.status_code
                     FROM urls JOIN url_checks
                     ON url_checks.url_id = urls.id
                     GROUP BY urls.id, urls.name, url_checks.status_code
                     ORDER BY urls.id DESC;
                 ''')
-            sites_and_checks_data = cursor.fetchall()
-            print(type(sites_and_checks_data))
-            print(sites_and_checks_data)
+            data = cursor.fetchall()
 
         except (Exception, psycopg2.DatabaseError) as error:
             connection.rollback()
@@ -198,9 +216,19 @@ def get_sites():
 
     connection.close()
 
+    for elem in data:
+        sites.append(
+            {
+                'id': elem[0],
+                'name': elem[1],
+                'last_check': elem[2],
+                'status_code': elem[3]
+            }
+        )
+
     return render_template(
         'urls.html',
-        data=sites_and_checks_data,
+        sites=sites,
     )
 
 
@@ -208,17 +236,12 @@ def get_sites():
 def get_site(id):
     messages = get_flashed_messages(True)
     site_data = get_site_data(id)
-    site = {
-        'id': site_data[0],
-        'name': site_data[1],
-        'created_at': site_data[2]
-    }
 
     checks = get_site_checks(id)
 
     return render_template(
         'url.html',
-        site=site,
+        site=site_data,
         messages=messages,
         checks=checks
     )
@@ -227,14 +250,16 @@ def get_site(id):
 @app.route('/urls/<int:id>/checks', methods=['POST'])
 def url_checks(id):
     site_data = get_site_data(id)
-    print(site_data)
-    url = site_data[1]
+    url = site_data['name']
 
     try:
         response = requests.get(url)
-    except (Exception, requests.exceptions.ConnectionError) as error:
+    except (
+        Exception, requests.exceptions.ConnectionError, ConnectionError
+    ) as error:
         print(error)
         flash('Произошла ошибка при проверке', 'danger')
+        # messages = get_flashed_messages(with_categories=True)
 
         return redirect(url_for('get_site', id=id), code=302)
 
@@ -252,26 +277,7 @@ def url_checks(id):
 
     html_doc = response.content
     soup = BeautifulSoup(html_doc, 'html.parser')
-    heading = soup.find('h1')
-
-    if heading is None:
-        heading = ''
-    else:
-        heading = heading.string
-
-    title = soup.title.string
-
-    if title is None:
-        title = ''
-
-    description = soup.find('meta', attrs={'name': 'description'})
-
-    if description is None:
-        description = ''
-    else:
-        description = description['content']
-
-    print(heading, title, description)
+    h1, title, description = parser.parse_info_for_check(soup)
 
     connection = get_db()
     created_at = datetime.now()
@@ -280,14 +286,10 @@ def url_checks(id):
 
         cursor.execute('''
             INSERT INTO url_checks(
-                url_id, h1, description, title, status_code, created_at
+                url_id, status_code, h1, description, title, created_at
             )
             VALUES (%s, %s, %s, %s, %s, %s);
-        ''', (
-            id, heading,
-            description, title,
-            response_status_code, created_at,
-        ))
+        ''', (id, response_status_code, h1, description, title, created_at,))
 
     connection.commit()
     connection.close()
