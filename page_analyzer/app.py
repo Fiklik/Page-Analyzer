@@ -86,12 +86,8 @@ def get_sites():
     with connection.cursor() as cursor:
         try:
             cursor.execute('''
-                    SELECT urls.id, urls.name,
-                    MAX(url_checks.created_at), url_checks.status_code
-                    FROM urls JOIN url_checks
-                    ON url_checks.url_id = urls.id
-                    GROUP BY urls.id, urls.name, url_checks.status_code
-                    ORDER BY urls.id DESC;
+                    SELECT id, name FROM urls
+                    ORDER BY id DESC;
                 ''')
             data = cursor.fetchall()
 
@@ -99,21 +95,39 @@ def get_sites():
             connection.rollback()
             print(error)
 
-    connection.close()
-
     for elem in data:
         sites.append(
             {
                 'id': elem[0],
-                'name': elem[1],
-                'last_check': elem[2],
-                'status_code': elem[3]
+                'name': elem[1]
             }
         )
+    
+    for site in sites:
+        print(site)
+        with connection.cursor() as cursor:
+            try:
+                cursor.execute('''
+                    SELECT created_at, status_code 
+                    FROM url_checks
+                    WHERE url_id = %s
+                    ORDER BY id DESC
+                    LIMIT 1;
+                ''', (site['id'],))
+                data = cursor.fetchone()
+                site['last_check'] = data[0]
+                site['status_code'] = data[1]
+            except (Exception, psycopg2.DatabaseError) as error:
+                print(error)
+                connection.rollback()
+                site['last_check'] = ''
+                site['status_code'] = ''
+
+    connection.close()
 
     return render_template(
         'urls.html',
-        sites=sites,
+        sites=sites
     )
 
 
@@ -152,7 +166,6 @@ def url_checks(id):
 
     if not valid_status_code:
         flash('Произошла ошибка при проверке', 'danger')
-        print(response_status_code)
 
         return redirect(url_for('get_site', id=id), code=302)
 
