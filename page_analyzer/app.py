@@ -152,6 +152,7 @@ def url_checks(id):
 
     if not valid_status_code:
         flash('Произошла ошибка при проверке', 'danger')
+        print(response_status_code)
 
         return redirect(url_for('get_site', id=id), code=302)
 
