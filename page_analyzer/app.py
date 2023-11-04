@@ -102,13 +102,12 @@ def get_sites():
                 'name': elem[1]
             }
         )
-    
+
     for site in sites:
-        print(site)
         with connection.cursor() as cursor:
             try:
                 cursor.execute('''
-                    SELECT created_at, status_code 
+                    SELECT created_at, status_code
                     FROM url_checks
                     WHERE url_id = %s
                     ORDER BY id DESC
