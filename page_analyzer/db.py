@@ -1,5 +1,6 @@
 import os
 import psycopg2
+from psycopg2.extras import NamedTupleCursor
 from dotenv import load_dotenv
 
 
@@ -13,19 +14,19 @@ def get_db():
 
 def get_site_id(connection, name):
 
-    with connection.cursor() as cursor:
+    with connection.cursor(cursor_factory=NamedTupleCursor) as cursor:
         cursor.execute('''
             SELECT id FROM urls
             WHERE name = %s
         ''', (name,))
-        id = cursor.fetchone()[0]
+        id = cursor.fetchone().id
 
     return id
 
 
 def get_site_data(connection, id):
 
-    with connection.cursor() as cursor:
+    with connection.cursor(cursor_factory=NamedTupleCursor) as cursor:
         cursor.execute('''
             SELECT * FROM urls
             WHERE id = %s
@@ -33,9 +34,9 @@ def get_site_data(connection, id):
         data = cursor.fetchone()
 
     site_data = {
-        'id': data[0],
-        'name': data[1],
-        'created_at': data[2]
+        'id': data.id,
+        'name': data.name,
+        'created_at': data.created_at
     }
 
     return site_data
@@ -44,7 +45,7 @@ def get_site_data(connection, id):
 def get_site_checks(connection, id):
     checks = []
 
-    with connection.cursor() as cursor:
+    with connection.cursor(cursor_factory=NamedTupleCursor) as cursor:
         cursor.execute('''
             SELECT * FROM url_checks WHERE url_id = %s ORDER BY id DESC;
         ''', (id,))
@@ -53,13 +54,13 @@ def get_site_checks(connection, id):
     for elem in data:
         checks.append(
             {
-                'id': elem[0],
-                'url_id': elem[1],
-                'status_code': elem[2],
-                'h1': elem[3],
-                'title': elem[4],
-                'description': elem[5],
-                'created_at': elem[6]
+                'id': elem.id,
+                'url_id': elem.url_id,
+                'status_code': elem.status_code,
+                'h1': elem.h1,
+                'title': elem.title,
+                'description': elem.description,
+                'created_at': elem.created_at
             }
         )
 
@@ -67,14 +68,14 @@ def get_site_checks(connection, id):
 
 
 def does_url_exists(connection, url):
-    with connection.cursor() as cursor:
+    with connection.cursor(cursor_factory=NamedTupleCursor) as cursor:
         try:
             cursor.execute('''
                 SELECT * FROM urls
                 WHERE name = %s;
             ''', (url,))
         except (Exception, psycopg2.DatabaseError) as error:
-            print(error)
+            return exist
 
         exist = cursor.fetchone()
 
@@ -83,7 +84,7 @@ def does_url_exists(connection, url):
 
 def insert_check_into_db(connection, check):
 
-    with connection.cursor() as cursor:
+    with connection.cursor(cursor_factory=NamedTupleCursor) as cursor:
 
         cursor.execute('''
             INSERT INTO url_checks(
@@ -105,7 +106,7 @@ def insert_check_into_db(connection, check):
 def get_sites_info(connection):
     sites = []
 
-    with connection.cursor() as cursor:
+    with connection.cursor(cursor_factory=NamedTupleCursor) as cursor:
         try:
             cursor.execute('''
                     SELECT id, name FROM urls
@@ -115,18 +116,17 @@ def get_sites_info(connection):
 
         except (Exception, psycopg2.DatabaseError) as error:
             connection.rollback()
-            print(error)
 
     for elem in data:
         sites.append(
             {
-                'id': elem[0],
-                'name': elem[1]
+                'id': elem.id,
+                'name': elem.name
             }
         )
 
     for site in sites:
-        with connection.cursor() as cursor:
+        with connection.cursor(cursor_factory=NamedTupleCursor) as cursor:
             try:
                 cursor.execute('''
                     SELECT created_at, status_code
@@ -136,10 +136,9 @@ def get_sites_info(connection):
                     LIMIT 1;
                 ''', (site['id'],))
                 data = cursor.fetchone()
-                site['last_check'] = data[0]
-                site['status_code'] = data[1]
+                site['last_check'] = data.created_at
+                site['status_code'] = data.status_code
             except (Exception, psycopg2.DatabaseError) as error:
-                print(error)
                 connection.rollback()
                 site['last_check'] = ''
                 site['status_code'] = ''
@@ -149,7 +148,7 @@ def get_sites_info(connection):
 
 def insert_site_into_db(connection, data):
 
-    with connection.cursor() as cursor:
+    with connection.cursor(cursor_factory=NamedTupleCursor) as cursor:
         cursor.execute('''
             INSERT INTO urls(name, created_at) VALUES (
                 %s, %s

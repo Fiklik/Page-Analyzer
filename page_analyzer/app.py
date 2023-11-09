@@ -117,7 +117,6 @@ def url_checks(id):
     except (
         Exception, requests.exceptions.ConnectionError, ConnectionError
     ) as error:
-        print(error)
         flash('Произошла ошибка при проверке', 'danger')
 
         return redirect(url_for('get_site', id=id), code=302)
