@@ -74,8 +74,8 @@ def does_url_exists(connection, url):
                 SELECT * FROM urls
                 WHERE name = %s;
             ''', (url,))
-        except (Exception, psycopg2.DatabaseError) as error:
-            return exist
+        except (Exception, psycopg2.DatabaseError):
+            return None
 
         exist = cursor.fetchone()
 
@@ -114,7 +114,7 @@ def get_sites_info(connection):
                 ''')
             data = cursor.fetchall()
 
-        except (Exception, psycopg2.DatabaseError) as error:
+        except (Exception, psycopg2.DatabaseError):
             connection.rollback()
 
     for elem in data:
@@ -138,7 +138,7 @@ def get_sites_info(connection):
                 data = cursor.fetchone()
                 site['last_check'] = data.created_at
                 site['status_code'] = data.status_code
-            except (Exception, psycopg2.DatabaseError) as error:
+            except (Exception, psycopg2.DatabaseError):
                 connection.rollback()
                 site['last_check'] = ''
                 site['status_code'] = ''
