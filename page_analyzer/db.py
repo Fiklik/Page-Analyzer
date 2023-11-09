@@ -75,7 +75,7 @@ def does_url_exists(connection, url):
                 WHERE name = %s;
             ''', (url,))
         except (Exception, psycopg2.DatabaseError):
-            return None
+            return False
 
         exist = cursor.fetchone()
 
